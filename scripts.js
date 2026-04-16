@@ -1,177 +1,188 @@
+
 const display = document.getElementById("display");
-const buttons = document.querySelectorAll(".button");
 
-let currentExpression = "0";
-let justEvaluated = false;
+let currentOperand = "0";
+let previousOperand = "";
+let operator = null;
+let shouldResetScreen = false;
 
-function updateDisplay(value) {
-  display.textContent = value;
+function updateDisplay() {
+  display.textContent = currentOperand;
 }
 
-function evaluateExpression(expr) {
-  let sanitized = expr
-    .replaceAll("×", "*")
-    .replaceAll("÷", "/")
-    .replaceAll("−", "-");
 
-  try {
-    const result = eval(sanitized);
-    return result.toString();
-  } catch (error) {
-    return "Error";
+function appendNumber(number) {
+
+  if (shouldResetScreen) {
+    currentOperand = "";
+    shouldResetScreen = false;
   }
+
+  if (number === "." && currentOperand.includes(".")) return;
+
+  if (currentOperand === "0" && number !== ".") {
+    currentOperand = number;
+  } else {
+    currentOperand += number;
+  }
+  updateDisplay();
 }
 
-function handlePlusMinus() {
-  let valueToChange;
-  if (currentExpression.includes("%")) {
-    const parts = currentExpression.split("%");
-    if (parts.length === 2 && parts[1] !== "") {
-      const base = parseFloat(parts[0]);
-      const percent = parseFloat(parts[1]);
-      if (!isNaN(base) && !isNaN(percent)) {
-        valueToChange = ((base / 100) * percent).toString();
-      } else {
-        valueToChange = "0";
+
+function clearAll() {
+  currentOperand = "0";
+  previousOperand = "";
+  operator = null;
+  shouldResetScreen = false;
+  updateDisplay();
+}
+
+
+function toggleSign() {
+  if (currentOperand === "0") return;
+  currentOperand = (parseFloat(currentOperand) * -1).toString();
+  updateDisplay();
+}
+
+function percent() {
+  let value = parseFloat(currentOperand);
+  if (isNaN(value)) return;
+
+  if (previousOperand !== "" && operator) {
+    const prev = parseFloat(previousOperand);
+    if (operator === "+" || operator === "−") {
+      value = prev * (value / 100);
+    } else if (operator === "×" || operator === "÷") {
+      value = value / 100;
+    }
+  } else {
+    value = value / 100;
+  }
+  currentOperand = value.toString();
+  updateDisplay();
+}
+
+
+function addDecimal() {
+  if (shouldResetScreen) {
+    currentOperand = "0";
+    shouldResetScreen = false;
+  }
+  if (!currentOperand.includes(".")) {
+    currentOperand += ".";
+  }
+  updateDisplay();
+}
+
+
+function chooseOperator(op) {
+
+  if (operator !== null && !shouldResetScreen) {
+    compute();
+  }
+
+  operator = op;
+  previousOperand = currentOperand;
+  shouldResetScreen = true;
+}
+
+
+function compute() {
+  const prev = parseFloat(previousOperand);
+  const current = parseFloat(currentOperand);
+  if (isNaN(prev) || isNaN(current)) return;
+
+  let result;
+  switch (operator) {
+    case "+":
+      result = prev + current;
+      break;
+    case "−":
+      result = prev - current;
+      break;
+    case "×":
+      result = prev * current;
+      break;
+    case "÷":
+      if (current === 0) {
+        currentOperand = "Ошибка";
+        updateDisplay();
+
+        previousOperand = "";
+        operator = null;
+        shouldResetScreen = true;
+        return;
       }
-    } else {
-      const base = parseFloat(parts[0]);
-      valueToChange = isNaN(base) ? "0" : base.toString();
-    }
-  } else {
-    valueToChange = evaluateExpression(currentExpression);
+      result = prev / current;
+      break;
+    default:
+      return;
   }
 
-  if (valueToChange !== "Error") {
-    let num = parseFloat(valueToChange);
-    if (!isNaN(num)) {
-      num = -num;
-      currentExpression = num.toString();
-    } else {
-      currentExpression = "0";
-    }
-  } else {
-    currentExpression = "0";
-  }
-  justEvaluated = true;
-  updateDisplay(currentExpression);
+
+  currentOperand = Math.round(result * 1000000) / 1000000;
+  currentOperand = currentOperand.toString();
+  operator = null;
+  previousOperand = "";
+  shouldResetScreen = true;
+  updateDisplay();
 }
 
-function handlePercent() {
-  let baseValue;
-  if (currentExpression.includes("%")) {
-    const parts = currentExpression.split("%");
-    baseValue = evaluateExpression(parts[0]);
-  } else {
-    baseValue = evaluateExpression(currentExpression);
-  }
-
-  if (baseValue !== "Error") {
-    currentExpression = baseValue + "%";
-  } else {
-    currentExpression = "0%";
-  }
-  justEvaluated = true;
-  updateDisplay(currentExpression);
-}
 
 function handleEquals() {
-  if (currentExpression.includes("%")) {
-    const parts = currentExpression.split("%");
-    if (parts.length === 2) {
-      const base = evaluateExpression(parts[0]);
-      const percent = parts[1] === "" ? "0" : evaluateExpression(parts[1]);
-      if (base !== "Error" && percent !== "Error") {
-        const baseNum = parseFloat(base);
-        const percentNum = parseFloat(percent);
-        if (!isNaN(baseNum) && !isNaN(percentNum)) {
-          const result = (baseNum / 100) * percentNum;
-          currentExpression = result.toString();
-        } else {
-          currentExpression = "Error";
-        }
-      } else {
-        currentExpression = "Error";
-      }
-    } else {
-      currentExpression = "Error";
-    }
-  } else {
-    currentExpression = evaluateExpression(currentExpression);
-  }
-  justEvaluated = true;
-  updateDisplay(currentExpression);
+  if (operator === null || shouldResetScreen) return;
+  compute();
 }
 
-function isOperator(char) {
-  return char === "+" || char === "−" || char === "×" || char === "÷";
-}
+document.getElementById("clear").addEventListener("click", clearAll);
+document.getElementById("plus-minus").addEventListener("click", toggleSign);
+document.getElementById("percent").addEventListener("click", percent);
+document
+  .getElementById("divide")
+  .addEventListener("click", () => chooseOperator("÷"));
+document
+  .getElementById("multiply")
+  .addEventListener("click", () => chooseOperator("×"));
+document
+  .getElementById("subtract")
+  .addEventListener("click", () => chooseOperator("−"));
+document
+  .getElementById("add")
+  .addEventListener("click", () => chooseOperator("+"));
+document.getElementById("equals").addEventListener("click", handleEquals);
+document.getElementById("decimal").addEventListener("click", addDecimal);
 
-function handleButtonClick(event) {
-  const button = event.target;
-  const buttonText = button.textContent;
 
-  if (button.id === "clear" || buttonText === "AC") {
-    currentExpression = "0";
-    justEvaluated = false;
-    updateDisplay(currentExpression);
-    return;
-  }
+document
+  .getElementById("zero")
+  .addEventListener("click", () => appendNumber("0"));
+document
+  .getElementById("one")
+  .addEventListener("click", () => appendNumber("1"));
+document
+  .getElementById("two")
+  .addEventListener("click", () => appendNumber("2"));
+document
+  .getElementById("three")
+  .addEventListener("click", () => appendNumber("3"));
+document
+  .getElementById("four")
+  .addEventListener("click", () => appendNumber("4"));
+document
+  .getElementById("five")
+  .addEventListener("click", () => appendNumber("5"));
+document
+  .getElementById("six")
+  .addEventListener("click", () => appendNumber("6"));
+document
+  .getElementById("seven")
+  .addEventListener("click", () => appendNumber("7"));
+document
+  .getElementById("eight")
+  .addEventListener("click", () => appendNumber("8"));
+document
+  .getElementById("nine")
+  .addEventListener("click", () => appendNumber("9"));
 
-  if (button.id === "plus-minus" || buttonText === "+/-") {
-    handlePlusMinus();
-    return;
-  }
 
-  if (button.id === "percent" || buttonText === "%") {
-    handlePercent();
-    return;
-  }
-
-  if (button.id === "equals" || buttonText === "=") {
-    handleEquals();
-    return;
-  }
-
-  const value = buttonText;
-
-  if (justEvaluated) {
-    if (!isNaN(value) || value === ".") {
-      currentExpression = "";
-    }
-    justEvaluated = false;
-  }
-
-  if (currentExpression === "0" && !isNaN(value) && value !== ".") {
-    currentExpression = value;
-    updateDisplay(currentExpression);
-    return;
-  }
-
-  if (value === ".") {
-    const parts = currentExpression.split(/[\+\−\×\÷]/);
-    const lastPart = parts[parts.length - 1];
-    if (lastPart.includes(".")) {
-      return;
-    }
-  }
-
-  if (isOperator(value)) {
-    const lastChar = currentExpression.slice(-1);
-    if (isOperator(lastChar)) {
-      currentExpression = currentExpression.slice(0, -1) + value;
-    } else {
-      currentExpression += value;
-    }
-  } else {
-    currentExpression += value;
-  }
-
-  updateDisplay(currentExpression);
-}
-
-buttons.forEach((button) => {
-  button.addEventListener("click", handleButtonClick);
-});
-
-updateDisplay(currentExpression);
+updateDisplay();
